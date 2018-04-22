@@ -21,49 +21,7 @@ import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.SettingsClient;
-import com.google.android.gms.tasks.OnSuccessListener;
-//import com.home_turf.location_spike.location.LocationHandler;
 
-//public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback {
-//
-//    //Constants
-//    private static String TAG = MainActivity.class.getSimpleName();
-//
-//    //Outlets
-//    private View mLayout;
-//    private TextView mLongitude;
-//    private TextView mLatitude;
-////    private LocationHandler mLocationHandler;
-//    private Location mLocation;
-//
-//    @Override
-//    protected void onCreate(Bundle savedInstanceState) {
-//        super.onCreate(savedInstanceState);
-//        setContentView(R.layout.activity_main);
-//
-//        mLayout = findViewById(R.id.main_layout);
-//        mLongitude = findViewById(R.id.longitude);
-//        mLatitude = findViewById(R.id.latitude);
-
-//        LocationHandler.initialize(this, getApplicationContext(), mLayout);
-//        mLocationHandler = LocationHandler.getInstance();
-
-        // Location
-        // Check permissions
-//        mLocationHandler.checkPermissions();
-
-//        if (mLocationHandler.checkPermissions() == false) {
-//            // Ask for permission
-//            Log.d(TAG, "onCreate Location Denied.");
-//            mLocationHandler.requestLocationPermission();
-//        } else {
-//            // Get location
-//            Log.d(TAG, "onCreate startLocationUpdates.");
-//            mLocationHandler.startLocationUpdates();
-//        }
-//        mLocation = mLocationHandler.getCurrentLocation();
-//    }
-//}
 
 public class MainActivity extends AppCompatActivity
         implements ActivityCompat.OnRequestPermissionsResultCallback {
@@ -95,8 +53,17 @@ public class MainActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mLayout = findViewById(R.id.main_layout);
-
+        mLongitude = findViewById(R.id.longitude);
+        mLatitude = findViewById(R.id.latitude);
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+
+        mCurrentLocation = new Location("Default");
+        mCurrentLocation.setLatitude(DEFAULT_LAT);
+        mCurrentLocation.setLongitude(DEFAULT_LON);
+        Log.d(TAG, String.valueOf(mCurrentLocation.getLatitude()));
+        Log.d(TAG, String.valueOf(mCurrentLocation.getLongitude()));
+        mLatitude.setText(String.valueOf(mCurrentLocation.getLatitude()));
+        mLongitude.setText(String.valueOf(mCurrentLocation.getLongitude()));
 
         // Check location permissions
         if (checkPermissions() == false) {
@@ -126,7 +93,6 @@ public class MainActivity extends AppCompatActivity
         }
 
     }
-
 
     private void requestLocationPermission() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
@@ -169,24 +135,6 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
-//    @SuppressWarnings("MissingPermission")
-//    private void saveLastLocation() {
-//        Log.d(TAG, "updateLocation with current location.");
-//        mFusedLocationClient.getLastLocation()
-//                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
-//                    @Override
-//                    public void onSuccess(Location location) {
-//                        if (location != null) {
-//                            Log.d(TAG, "Location returned.");
-//                            onLocationChanged(location);
-//                        } else {
-//                            Log.d(TAG, "Null location returned.");
-//                        }
-//                        saveTextLabel();
-//                    }
-//                });
-//    }
-
     // Trigger new location updates at interval
     @SuppressLint("MissingPermission")
     protected void startLocationUpdates() {
@@ -228,8 +176,22 @@ public class MainActivity extends AppCompatActivity
 
     public void onLocationChanged(Location location) {
         // New location has now been determined
-        mCurrentLocation = location;
-        Log.d(TAG, String.valueOf(mCurrentLocation.getLatitude()));
-        Log.d(TAG, String.valueOf(mCurrentLocation.getLongitude()));
+        if (location != null) {
+            mCurrentLocation = location;
+            Log.d(TAG, String.valueOf(mCurrentLocation.getLatitude()));
+            Log.d(TAG, String.valueOf(mCurrentLocation.getLongitude()));
+            // Update Screen
+            mLatitude.setText(String.valueOf(mCurrentLocation.getLatitude()));
+            mLongitude.setText(String.valueOf(mCurrentLocation.getLongitude()));
+        }
+        else {
+            // Update Screen
+            mLatitude.setText(String.valueOf(DEFAULT_LAT));
+            mLongitude.setText(String.valueOf(DEFAULT_LON));
+        }
+
+
+
+
     }
 }
