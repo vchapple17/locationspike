@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">location-spike</string>
+    <string name="locationPermissionRequired">Let us use your current location.</string>
+    <string name="okButtonText">OKAY</string>
 </resources>
