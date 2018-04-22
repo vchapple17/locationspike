@@ -2,6 +2,7 @@ package com.home_turf.location_spike;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Looper;
@@ -12,6 +13,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -45,6 +47,7 @@ public class MainActivity extends AppCompatActivity
     private View mLayout;
     private TextView mLongitude;
     private TextView mLatitude;
+    private Button mGoToMaps;
 
 
     @Override
@@ -55,6 +58,8 @@ public class MainActivity extends AppCompatActivity
         mLayout = findViewById(R.id.main_layout);
         mLongitude = findViewById(R.id.longitude);
         mLatitude = findViewById(R.id.latitude);
+        mGoToMaps = findViewById(R.id.button_map);
+
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
         mCurrentLocation = new Location("Default");
@@ -76,6 +81,14 @@ public class MainActivity extends AppCompatActivity
             startLocationUpdates();
         }
 
+        mGoToMaps.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.d(TAG, "Maps Clicked");
+                Intent intent = new Intent(MainActivity.this, MapsActivity.class);
+                startActivity(intent);
+            }
+        });
     }
 
     @Override
