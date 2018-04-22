@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
 
-//import com.home_turf.location_spike.location.LocationHandler;
-
 
 /**
  * Created by valchapple on 4/10/18.

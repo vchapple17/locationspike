@@ -1,10 +1,12 @@
 //package com.home_turf.location_spike.location;
 //
 //import android.Manifest;
+//import android.annotation.SuppressLint;
 //import android.app.Activity;
 //import android.content.Context;
 //import android.content.pm.PackageManager;
 //import android.location.Location;
+//
 //import android.os.Looper;
 //import android.support.annotation.NonNull;
 //import android.support.design.widget.Snackbar;
@@ -20,11 +22,10 @@
 //import com.google.android.gms.location.LocationServices;
 //import com.google.android.gms.location.LocationSettingsRequest;
 //import com.google.android.gms.location.SettingsClient;
-//
-//import com.google.android.gms.tasks.OnSuccessListener;
 //import com.home_turf.location_spike.R;
 //
-//public class LocationHandler {
+//
+//public class LocationHandler implements ActivityCompat.OnRequestPermissionsResultCallback{
 //    private static String TAG = LocationHandler.class.getSimpleName();
 //    private static final int LOCATION_PERMISSION_RESULT = 17;
 //    private static final double DEFAULT_LAT = 44.5;
@@ -33,31 +34,34 @@
 //    private long FASTEST_INTERVAL = 2000; /* 2 sec */
 //
 //
-//    // STATIC Location instances
+//    // STATIC LocationHandler instance
 //    private static LocationHandler instance = null;
 //
-//    private FusedLocationProviderClient fusedLocationClient;
+//    // Private Variables
 //    private Context context;
+//    private Activity activity;
+//    private View layout;
+//    private FusedLocationProviderClient fusedLocationClient;
 //    private LocationRequest locationRequest;
 //    private Location currentLocation;
-//
 //
 //    public Location getCurrentLocation() {
 //        return currentLocation;
 //    }
 //
-//
-//
 //    public static LocationHandler getInstance() { return instance; }
 //
-//    public static void initialize(Context context) {
+//    public static void initialize(Activity activity, Context context, View layout) {
 //        if (instance == null) {
-//            instance = new LocationHandler(context);
+//            instance = new LocationHandler(activity, context, layout);
 //        }
 //    }
 //
-//    private LocationHandler(Context context) {
+//    private LocationHandler(Activity activity, Context context, View layout) {
 //        this.context = context;
+//        this.activity = activity;
+//        this.layout = layout;
+//
 //        this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(context);
 //        this.currentLocation = new Location("default");
 //        this.currentLocation.setLatitude(DEFAULT_LAT);
@@ -67,12 +71,20 @@
 ////        if (checkPermissions() == false) {
 ////            // Ask for permission
 ////            Log.d(TAG, "onCreate Location Denied.");
-////            requestLocationPermission();
+//////            requestLocationPermission();
 ////        } else {
 ////            // Get location
 ////            Log.d(TAG, "onCreate startLocationUpdates.");
-//////            startLocationUpdates();
+////////            startLocationUpdates();
 ////        }
+//    }
+//
+//    public Activity getActivity() {
+//        return this.activity;
+//    }
+//
+//    public View getLayout() {
+//        return this.layout;
 //    }
 //
 //    public Context getContext() {
@@ -82,40 +94,63 @@
 //    public boolean checkPermissions() {
 //        if (ActivityCompat.checkSelfPermission(this.context,
 //                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-//            return true;
+////            return true;
+//            requestLocationPermission();
 //        } else {
-//            return false;
+////            return false;
+//            startLocationUpdates();
+//        }
+//    }
+//
+//
+//    private void startLocationPermissionRequest() {
+//        ActivityCompat.requestPermissions(activity,
+//                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+//                LOCATION_PERMISSION_RESULT);    // IDENTIFIER FOR REQUEST CALLBACK
+//    }
+//
+//    @Override
+//    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+//                                           @NonNull int[] grantResults) {
+//        Log.d(TAG, "onRequestPermissionsResult");
+//        if (requestCode == LOCATION_PERMISSION_RESULT) {
+//            // Analyze for location permission.
+//            if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+//                // Permission has been granted. Get Location
+//                Log.d(TAG, "onRequestPermissionsResult Permission granted");
+//                startLocationUpdates();
+//            }
 //        }
 //    }
 //
 //    // Trigger new location updates at interval
-////    @SuppressLint("MissingPermission")
+//    @SuppressLint("MissingPermission")
 //    protected void startLocationUpdates() {
-////        // Modified from Reference:
-////        // https://github.com/codepath/android_guides/wiki/Retrieving-Location-with-LocationServices-API
-////        // Create the location request to start receiving updates
-////        locationRequest = new LocationRequest();
-////        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-////        locationRequest.setInterval(UPDATE_INTERVAL);
-////        locationRequest.setFastestInterval(FASTEST_INTERVAL);
-////
-////        // Create LocationSettingsRequest object using location request
-////        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder();
-////        builder.addLocationRequest(locationRequest);
-////        LocationSettingsRequest locationSettingsRequest = builder.build();
-////
-////        // Check whether location settings are satisfied
-////        // https://developers.google.com/android/reference/com/google/android/gms/location/SettingsClient
-////        SettingsClient settingsClient = LocationServices.getSettingsClient(this);
-////        settingsClient.checkLocationSettings(locationSettingsRequest);
-////
-////        // new Google API SDK v11 uses getFusedLocationProviderClient(this)
-////        fusedLocationClient.requestLocationUpdates(locationRequest, new LocationCallback() {
-////            @Override
-////            public void onLocationResult(LocationResult locationResult) {
-////                onLocationChanged(locationResult.getLastLocation());
-////            }
-////        }, Looper.myLooper());
+//        // Modified from Reference:
+//        // https://github.com/codepath/android_guides/wiki/Retrieving-Location-with-LocationServices-API
+//        // Create the location request to start receiving updates
+//        locationRequest = new LocationRequest();
+//        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+//        locationRequest.setInterval(UPDATE_INTERVAL);
+//        locationRequest.setFastestInterval(FASTEST_INTERVAL);
+//
+//        // Create LocationSettingsRequest object using location request
+//        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder();
+//        builder.addLocationRequest(locationRequest);
+//        LocationSettingsRequest locationSettingsRequest = builder.build();
+//
+//        // Check whether location settings are satisfied
+//        // https://developers.google.com/android/reference/com/google/android/gms/location/SettingsClient
+//        SettingsClient settingsClient = LocationServices.getSettingsClient(context);
+//        settingsClient.checkLocationSettings(locationSettingsRequest);
+//
+//        // new Google API SDK v11 uses getFusedLocationProviderClient(this)
+//        fusedLocationClient.requestLocationUpdates(locationRequest, new LocationCallback() {
+//            @Override
+//            public void onLocationResult(LocationResult locationResult) {
+//                onLocationChanged(locationResult.getLastLocation());
+//            }
+//        }, Looper.myLooper());
 //    }
 //
 //
@@ -132,7 +167,7 @@
 //
 //
 //
-////
+//
 ////    @Override
 ////    public void onResume(){
 ////        super.onResume();
@@ -149,47 +184,13 @@
 ////
 ////    }
 //
-//
-//
-////    // Handle Click and Location Permissions
-////    private void submitText() {
-////        // Get Text
-////        // Connect Edit Text
-////        textView = findViewById(R.id.editText);
-////
-////        String txt = textView.getText().toString();
-////
-////        // Check txt is not empty
-////        if (txt.length() > 0) {
-////            Log.d(TAG, "submitText Not Empty.");
-////
-////            // Check location permissions
-////            if (checkPermissions() == false) {
-////                // Ask for permission
-////                Log.d(TAG, "submitText Location Denied.");
-////                mCurrentLocation = new Location("default");
-////                mCurrentLocation.setLatitude(DEFAULT_LAT);
-////                mCurrentLocation.setLongitude(DEFAULT_LON);
-////                requestLocationPermission();
-////                saveTextLabel();
-////
-////            } else {
-////                // Get location
-////                Log.d(TAG, "submitText Logging with location.");
-////                saveLastLocation();
-////            }
-////        }
-////    }
-//
-//    public void requestLocationPermission(Activity activ, View layout) {
-//        if (ActivityCompat.shouldShowRequestPermissionRationale( activ, Manifest.permission.ACCESS_FINE_LOCATION)) {
+//    public void requestLocationPermission() {
+//        if (ActivityCompat.shouldShowRequestPermissionRationale( activity, Manifest.permission.ACCESS_FINE_LOCATION)) {
 //            // Additional rationale for the use of the permission with button to request
 //            // Reference: Google's Examples
 //            Log.d(TAG, "requestLocationPermission Pre-Prompt Location Permission.");
-//            Snackbar.make(activ,"HELLO", Snackbar.LENGTH_INDEFINITE);
-////            Snackbar.make(activ, R.string.locationPermissionRequired, Snackbar.LENGTH_INDEFINITE);
-//////            Snackbar.make(activity, R.string.locationPermissionRequired, Snackbar.LENGTH_INDEFINITE)
-////                    .setAction(R.string.okButtonText, new View.OnClickListener() {
+//            Snackbar.make(layout, R.string.locationPermissionRequired, Snackbar.LENGTH_INDEFINITE)
+//                    .setAction(R.string.okButtonText, new View.OnClickListener() {
 //                @Override
 //                public void onClick(View view) {
 //                    // Request the permission
@@ -204,26 +205,6 @@
 //        }
 //    }
 //
-//    private void startLocationPermissionRequest() {
-////        ActivityCompat.requestPermissions()
-////        ActivityCompat.requestPermissions(this.context,
-////                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-////                LOCATION_PERMISSION_RESULT);    // IDENTIFIER FOR REQUEST CALLBACK
-//    }
-//
-////    @Override
-////    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-////                                           @NonNull int[] grantResults) {
-////        Log.d(TAG, "onRequestPermissionsResult");
-////        if (requestCode == LOCATION_PERMISSION_RESULT) {
-////            // Analyze for location permission.
-////            if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-////                // Permission has been granted. Get Location
-////                Log.d(TAG, "onRequestPermissionsResult Permission granted");
-////                startLocationUpdates();
-////            }
-////        }
-////    }
 //
 //    @SuppressWarnings("MissingPermission")
 //    private void saveLastLocation() {
@@ -269,8 +250,8 @@
 //
 //    public void onLocationChanged(Location location) {
 ////        // New location has now been determined
-////        mCurrentLocation = location;
-////        Log.d(TAG, String.valueOf(mCurrentLocation.getLatitude()));
-////        Log.d(TAG, String.valueOf(mCurrentLocation.getLongitude()));
+//        this.currentLocation = location;
+//        Log.d(TAG, String.valueOf(currentLocation.getLatitude()));
+//        Log.d(TAG, String.valueOf(currentLocation.getLongitude()));
 //    }
 //}
