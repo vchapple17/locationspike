@@ -86,6 +86,8 @@ public class MainActivity extends AppCompatActivity
             public void onClick(View v) {
                 Log.d(TAG, "Maps Clicked");
                 Intent intent = new Intent(MainActivity.this, MapsActivity.class);
+                intent.putExtra("Lat", String.valueOf(mCurrentLocation.getLatitude()));
+                intent.putExtra("Lon", String.valueOf(mCurrentLocation.getLongitude()));
                 startActivity(intent);
             }
         });
@@ -202,9 +204,5 @@ public class MainActivity extends AppCompatActivity
             mLatitude.setText(String.valueOf(DEFAULT_LAT));
             mLongitude.setText(String.valueOf(DEFAULT_LON));
         }
-
-
-
-
     }
 }
