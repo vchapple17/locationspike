@@ -72,7 +72,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     // Keys for storing activity state in the Bundle.
     protected final static String REQUESTING_LOCATION_UPDATES_KEY = "requesting-location-updates-key";
-//    protected final static String LOCATION_KEY = "location-key";
+    protected final static String CAMERA_LOCATION_KEY = "camera-location-key";
+//    protected final static String CAMERA_LOCATION_KEY = "camera-location-key";
 
 
     // Location Services API
@@ -89,13 +90,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         updateValuesFromBundle(savedInstanceState);
         mLayout = findViewById(R.id.map_layout);
 
-        if (checkProviders()) {
-            Log.d(TAG, "checkProviders is true");
-        }
-        else {
-            Log.d(TAG, "checkProviders is false");
-        }
-
         // Location Client
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
@@ -109,36 +103,54 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         createLocationRequest();
 
         // Location Callback
-        mLocationCallback = new LocationCallback() {
-            @Override
-            public void onLocationResult(LocationResult locationResult) {
-                if (locationResult == null) {
-                    return;
-                }
-                for (Location location : locationResult.getLocations()) {
-                    // Update UI with location data
-                    onLocationChanged(locationResult.getLastLocation());
-                }
-            };
-        };
+        createLocationCallback();
 
-        // Check location permissions
-        if (checkPermissions() == false) {
-            // Ask for permission
-            Log.d(TAG, "onCreate Location Denied.");
-            requestLocationPermission();
-        } else {
-            // Get location
-            Log.d(TAG, "onCreate startLocationUpdates.");
-            startLocationUpdates();
+    }
+
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        checkLocationServices();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopLocationUpdates();
+    }
+
+    /* Handle any results from Activities or Exception Resolutions */
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        // Handle that Settings Request Check was successful
+        if (requestCode == REQUEST_CHECK_SETTINGS) {    //
+            switch (resultCode) {
+                case RESULT_OK:
+                    Log.i(TAG, "User agreed to make required location settings changes.");
+                    // Nothing to do. startLocationUpdates() gets called in onResume again.
+                    break;
+                case RESULT_CANCELED:
+                    Log.i(TAG, "User chose not to make required location settings changes.");
+                    mRequestingLocationUpdates = false;
+                    Snackbar.make(mLayout, "Location Services are Required",Snackbar.LENGTH_LONG);
+                    mMap.clear();
+                    break;
+            }
         }
     }
 
+
+    /*
+     * Handle UI saved state
+     */
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         outState.putBoolean(REQUESTING_LOCATION_UPDATES_KEY,
                 mRequestingLocationUpdates);
-        // ...
+
+        // Save Current Location and Camera Angle
+
         super.onSaveInstanceState(outState);
     }
 
@@ -157,6 +169,74 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         // Update UI to match restored state
 //        updateUI();
+    }
+
+
+    /*
+    * Location Permission and Update Functions
+    * */
+
+
+    private void checkLocationServices() {
+        // Check location permissions & providers
+        if (!checkPermissions()) {
+            // Ask for permissions to access Location Information
+            Log.d(TAG, "onResume Location Denied.");
+            requestLocationPermission();
+        } else {
+            if (checkProviders()) {
+                // Permissions granted and providers are enabled.
+                Log.d(TAG, "onResume startLocationUpdates.");
+                startLocationUpdates();
+            }
+            else {
+                // Permissions granted but providers turned off
+                // Send to main location settings to turn on GPS and Network
+                Log.d(TAG, "onResume noProviders available.");
+                startLocationUpdates();
+                Snackbar.make(mLayout, R.string.locationPermissionRequired,
+                        Snackbar.LENGTH_INDEFINITE).setAction(R.string.okButtonText, new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        // Request the permission
+                        Log.d(TAG, "requestLocationPermission OK to request Location Permission.");
+                        startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                    }
+                }).show();
+            }
+        }
+    }
+
+
+    private boolean checkPermissions() {
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean checkProviders() {
+        LocationManager locationManager = (LocationManager) getApplicationContext()
+                .getSystemService(LOCATION_SERVICE);
+        try {
+            List<String> providers = locationManager.getProviders(true);
+            boolean isGpsEnabled = false;
+            boolean isNetworkEnabled = false;
+            for (String s: providers) {
+                if (s.equals("gps")) { isGpsEnabled = true; }
+                else if (s.equals("network")) { isNetworkEnabled = true; }
+            }
+
+            if (isGpsEnabled && isNetworkEnabled) { return true; }
+            else { return false; }
+            
+        } catch (NullPointerException e) {
+            return false;
+        }
+
+
     }
 
     private void createLocationRequest() {
@@ -204,78 +284,17 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQUEST_CHECK_SETTINGS) {    //
-            // Make sure the request was successful
-            switch (resultCode) {
-                case RESULT_OK:
-                    Log.i(TAG, "User agreed to make required location settings changes.");
-                    // Nothing to do. startLocationupdates() gets called in onResume again.
-                    break;
-                case RESULT_CANCELED:
-                    Log.i(TAG, "User chose not to make required location settings changes.");
-                    mRequestingLocationUpdates = false;
-                    Snackbar.make(mLayout, "Location Services are Required",Snackbar.LENGTH_LONG);
-                    mMap.clear();
-                    break;
-            }
-            return;
-        }
-    }
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
-    @SuppressLint("MissingPermission")
-    @Override
-    public void onMapReady(GoogleMap googleMap) {
-        mMap = googleMap;
-        mMap.setMyLocationEnabled(true);
-        mMap.setOnMyLocationButtonClickListener(this);
-        mMap.setOnMyLocationClickListener(this);
-
-        addGamePins();
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-
-//        if (mRequestingLocationUpdates) {
-//            startLocationUpdates();
-//        }
-        // Check location permissions
-        if (checkPermissions() == false) {
-            // Ask for permission
-            Log.d(TAG, "onResume Location Denied.");
-            requestLocationPermission();
-        } else {
-            if (checkProviders()) {
-                // Get location
-                Log.d(TAG, "onResume startLocationUpdates.");
-                startLocationUpdates();
-            }
-            else {
-                Log.d(TAG, "onResume noProviders available.");
-                startLocationUpdates();
-                Snackbar.make(mLayout, R.string.locationPermissionRequired,
-                        Snackbar.LENGTH_INDEFINITE).setAction(R.string.okButtonText, new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        // Request the permission
-                        Log.d(TAG, "requestLocationPermission OK to request Location Permission.");
-//                        startLocationPermissionRequest();
-                        startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-                    }
-                }).show();
-            }
-        }
+    private void createLocationCallback() {
+        mLocationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                if (locationResult == null) return;
+                for (Location location : locationResult.getLocations()) {
+                    // Update UI with location data
+                    onLocationChanged(locationResult.getLastLocation());
+                }
+            };
+        };
     }
 
     private void requestLocationPermission() {
@@ -318,36 +337,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    // Trigger new location updates at interval
+
     @SuppressLint("MissingPermission")
     protected void startLocationUpdates() {
-        // new Google API SDK v11 uses getFusedLocationProviderClient(this)
+        // new Google API SDK v11 uses getFus   edLocationProviderClient(this)
         mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
     }
 
-    private boolean checkPermissions() {
-        if (ActivityCompat.checkSelfPermission(this,
-                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    private boolean checkProviders() {
-        LocationManager locationManager = (LocationManager) getApplicationContext()
-                .getSystemService(LOCATION_SERVICE);
-        List<String> providers = locationManager.getProviders(true);
-        boolean isGpsEnabled = false;
-        boolean isNetworkEnabled = false;
-        for (String s: providers) {
-            if (s.equals("gps")) { isGpsEnabled = true; }
-            else if (s.equals("network")) { isNetworkEnabled = true; }
-        }
-
-        if (isGpsEnabled && isNetworkEnabled) { return true; }
-        else { return false; }
-
+    private void stopLocationUpdates() {
+        mFusedLocationClient.removeLocationUpdates(mLocationCallback);
+        mRequestingLocationUpdates = false;
     }
 
     @SuppressLint("MissingPermission")
@@ -367,6 +366,40 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         }
     }
+
+
+    /* Current Location Functions
+    * https://developers.google.com/maps/documentation/android-api/location
+    * */
+    @Override
+    public boolean onMyLocationButtonClick() {
+//        Toast.makeText(this, "MyLocation button clicked", Toast.LENGTH_SHORT).show();
+        // Zooms to User location
+        return false;
+    }
+
+    @Override
+    public void onMyLocationClick(@NonNull Location location) {
+//        Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
+    }
+
+
+
+    /*
+     * Populate Map
+     */
+    @SuppressLint("MissingPermission")
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+        mMap = googleMap;
+        // Access Current Location
+        mMap.setMyLocationEnabled(true);
+        mMap.setOnMyLocationButtonClickListener(this);  // When upper right button clicked
+        mMap.setOnMyLocationClickListener(this);        // When blue dot clicked
+
+        addGamePins();  // Add game pins
+    }
+
 
     private void addGamePins() {
         // Mock game
@@ -402,28 +435,5 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
 
-    //https://developers.google.com/maps/documentation/android-api/location
-    @Override
-    public boolean onMyLocationButtonClick() {
-//        Toast.makeText(this, "MyLocation button clicked", Toast.LENGTH_SHORT).show();
-        // Zooms to User location
-        return false;
-    }
 
-    @Override
-    public void onMyLocationClick(@NonNull Location location) {
-//        Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
-    }
-
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        stopLocationUpdates();
-    }
-
-    private void stopLocationUpdates() {
-        mFusedLocationClient.removeLocationUpdates(mLocationCallback);
-        mRequestingLocationUpdates = false;
-    }
 }
