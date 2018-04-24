@@ -30,6 +30,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnFailureListener;
@@ -59,31 +60,32 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     // Outlets
     private GoogleMap mMap;
     private View mLayout;
-    private boolean isMapReady;
-    private boolean zoomToCurrent;
 
     //// Location
     private FusedLocationProviderClient mFusedLocationClient;
     private LocationCallback mLocationCallback;
-    private boolean mRequestingLocationUpdates;
+//    private boolean mRequestingLocationUpdates;
 
     // Keys for storing activity state in the Bundle.
-    protected final static String REQUESTING_LOCATION_UPDATES_KEY = "requesting-location-updates-key";
-    protected final static String CAMERA_LOCATION_KEY = "camera-location-key";
-//    protected final static String CAMERA_LOCATION_KEY = "camera-location-key";
-
+    protected final static String STATE_MAP_CAMERA_KEY = "camera-location-key";
+    protected final static String STATE_MAP_RECENTER_KEY = "camera-recenter-key";
 
     // Location Services API
     private LocationRequest mLocationRequest;
     private long UPDATE_INTERVAL = 5 * 1000;  /* 5 secs */
     private long FASTEST_INTERVAL = 2000; /* 2 sec */
 
+    // Google Map
+    private boolean isMapReady;
+    private boolean zoomToCurrentLocation;
+    private CameraPosition mCameraPosition;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         // Basic setup from bundle
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
+        zoomToCurrentLocation = true;
         updateValuesFromBundle(savedInstanceState);
         mLayout = findViewById(R.id.map_layout);
 
@@ -92,7 +94,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         // Load Map Fragment Asynchronously. Get notified via onMapReady function
         isMapReady = false;
-        zoomToCurrent = false;
+
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
@@ -130,7 +132,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     break;
                 case RESULT_CANCELED:
                     Log.i(TAG, "User chose not to make required location settings changes.");
-                    mRequestingLocationUpdates = false;
+//                    mRequestingLocationUpdates = false;
                     Snackbar.make(mLayout, "Location Services are Required",Snackbar.LENGTH_LONG);
                     mMap.clear();
                     break;
@@ -144,11 +146,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
      */
     @Override
     protected void onSaveInstanceState(Bundle outState) {
-        outState.putBoolean(REQUESTING_LOCATION_UPDATES_KEY,
-                mRequestingLocationUpdates);
-
-        // TODO Save Current Location and Camera Angle
-        //
+        Log.i(TAG, "onSaveInstanceState called");
+        if (mMap != null) {
+            outState.putBoolean(STATE_MAP_RECENTER_KEY, zoomToCurrentLocation);
+            outState.putParcelable(STATE_MAP_CAMERA_KEY, mMap.getCameraPosition());
+        }
         super.onSaveInstanceState(outState);
     }
 
@@ -157,16 +159,19 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             return;
         }
 
-        // Update the value of mRequestingLocationUpdates from the Bundle.
-        if (savedInstanceState.keySet().contains(REQUESTING_LOCATION_UPDATES_KEY)) {
-            mRequestingLocationUpdates = savedInstanceState.getBoolean(
-                    REQUESTING_LOCATION_UPDATES_KEY);
+        // Update the value of mCameraPosition from the Bundle.
+        if (savedInstanceState.keySet().contains(STATE_MAP_RECENTER_KEY)) {
+            zoomToCurrentLocation = savedInstanceState.getBoolean(
+                    STATE_MAP_RECENTER_KEY);
+            if (!zoomToCurrentLocation && (savedInstanceState.keySet().contains(STATE_MAP_CAMERA_KEY))) {
+                Log.i(TAG, "updateValuesFromBundle camera position");
+                mCameraPosition = savedInstanceState.getParcelable(STATE_MAP_CAMERA_KEY);
+            }
         }
-
-        // ...
-
-        // Update UI to match restored state
-//        updateUI();
+        else {
+            zoomToCurrentLocation = true;
+            mCameraPosition = null;
+        }
     }
 
 
@@ -342,7 +347,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                         // GPS location can be null if GPS is switched off
                         if (location != null) {
                             onLocationChanged(location);
-                            zoomToCurrent = true;
                         }
                     }
                 })
@@ -359,20 +363,20 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void stopLocationUpdates() {
         mFusedLocationClient.removeLocationUpdates(mLocationCallback);
-        mRequestingLocationUpdates = false;
+//        mRequestingLocationUpdates = false;
     }
 
     @SuppressLint("MissingPermission")
     private void onLocationChanged(Location location) {
-        if (isMapReady && zoomToCurrent) {
+        if (isMapReady && zoomToCurrentLocation) {
             // New location has now been determined
             if (location != null) {
                 // Update Screen To current location on start
-                float zoomLevel = 8.0f; //This goes up to 21
+                float zoomLevel = 13.0f; //This goes up to 21
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
                         new LatLng(location.getLatitude(),
                                 location.getLongitude()), zoomLevel));
-                zoomToCurrent = false;
+                zoomToCurrentLocation = false;
             }
         }
     }
@@ -403,16 +407,23 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     public void onMapReady(GoogleMap googleMap) {
         isMapReady = true;
-        zoomToCurrent = true;
+
         mMap = googleMap;
         mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
         mMap.setMinZoomPreference(6.0f);
-        mMap.setMaxZoomPreference(14.0f);
+        mMap.moveCamera(CameraUpdateFactory.zoomTo(21f));
+        mMap.setMaxZoomPreference(18.0f);
 
-        googleMap.getUiSettings().setZoomControlsEnabled(true);
-        googleMap.getUiSettings().setCompassEnabled(true);
-        googleMap.getUiSettings().setAllGesturesEnabled(true);
+        mMap.getUiSettings().setZoomControlsEnabled(true);
+        mMap.getUiSettings().setCompassEnabled(true);
+        mMap.getUiSettings().setAllGesturesEnabled(true);
 
+        // Restore Camera Position
+        if (mCameraPosition  != null) {
+            Log.d(TAG, "camera position");
+            Log.d(TAG, mCameraPosition.toString());
+            mMap.moveCamera(CameraUpdateFactory.newCameraPosition(mCameraPosition));
+        }
 
         // Access Current Location
         mMap.setMyLocationEnabled(true);
@@ -453,7 +464,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void addGamePin(Double lat, Double lon, String name) {
         LatLng pin = new LatLng(lat, lon);
         mMap.addMarker(new MarkerOptions().position(pin).title(name));
-//        mMap.moveCamera(CameraUpdateFactory.newLatLng(current));
     }
 
 
