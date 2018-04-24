@@ -30,8 +30,10 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -54,6 +56,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final String TAG = MapsActivity.class.getSimpleName();
     private static final int LOCATION_PERMISSION_RESULT = 17;
     private static final int REQUEST_CHECK_SETTINGS = 1234;
+    private static final String BASEBALL_STRING = "BASEBALL";
+    private static final String BASKETBALL_STRING = "BASKETBALL";
+    private static final String UNKNOWN_SPORT_STRING = "blah";
     private static final double DEFAULT_LAT = 44.5;
     private static final double DEFAULT_LON = -123.2;
 
@@ -456,15 +461,36 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         final int size = latitudes.size();
         for (int i = 0; i < size; i++) {
-            addGamePin(latitudes.get(i), longitudes.get(i), names.get(i));
+            if (i % 3 == 0) {
+                addGamePin(latitudes.get(i), longitudes.get(i), names.get(i), BASEBALL_STRING);
+            } else if (i % 3 == 1) {
+                addGamePin(latitudes.get(i), longitudes.get(i), names.get(i), BASKETBALL_STRING);
+            } else {
+                addGamePin(latitudes.get(i), longitudes.get(i), names.get(i), UNKNOWN_SPORT_STRING);
+            }
         }
 
     }
 
-    private void addGamePin(Double lat, Double lon, String name) {
+    private void addGamePin(Double lat, Double lon, String name, String sport) {
         LatLng pin = new LatLng(lat, lon);
-        mMap.addMarker(new MarkerOptions().position(pin).title(name));
+        MarkerOptions mark = new MarkerOptions()
+                .position(pin)
+                .title(name)
+                .snippet("More information here");
+//                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
+        switch(sport) {
+            case BASEBALL_STRING:
+                mark.icon(BitmapDescriptorFactory.fromAsset("baseball.png"));
+                break;
+            case BASKETBALL_STRING:
+                mark.icon(BitmapDescriptorFactory.fromAsset("basketball.png"));
+                break;
+        }
+
+        mMap.addMarker(mark);
     }
+
 
 
 
