@@ -54,7 +54,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     //// Location
     private FusedLocationProviderClient mFusedLocationClient;
     private Location mCurrentLocation;
+    private LocationCallback mLocationCallback;
+    private boolean mRequestingLocationUpdates;
 
+    // Keys for storing activity state in the Bundle.
+    protected final static String REQUESTING_LOCATION_UPDATES_KEY = "requesting-location-updates-key";
+//    protected final static String LOCATION_KEY = "location-key";
 
     // Location Services API
     private LocationRequest mLocationRequest;
@@ -66,6 +71,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
+
+        updateValuesFromBundle(savedInstanceState);
 
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
@@ -79,6 +86,40 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         mCurrentLocation.setLongitude(Double.valueOf(mLongitude));
         isMapReady = false;
 
+
+        // Location Request
+        // https://github.com/codepath/android_guides/wiki/Retrieving-Location-with-LocationServices-API
+        // Create the location request to start receiving updates
+        mLocationRequest = new LocationRequest();
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        mLocationRequest.setInterval(UPDATE_INTERVAL);
+        mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
+
+        // Create LocationSettingsRequest object using location request
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder();
+        builder.addLocationRequest(mLocationRequest);
+        LocationSettingsRequest locationSettingsRequest = builder.build();
+
+        // Check whether location settings are satisfied
+        // https://developers.google.com/android/reference/com/google/android/gms/location/SettingsClient
+        SettingsClient settingsClient = LocationServices.getSettingsClient(this);
+        settingsClient.checkLocationSettings(locationSettingsRequest);
+
+
+        // Location Callback
+        mLocationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                if (locationResult == null) {
+                    return;
+                }
+                for (Location location : locationResult.getLocations()) {
+                    // Update UI with location data
+                    onLocationChanged(locationResult.getLastLocation());
+                }
+            };
+        };
+
         // Check location permissions
         if (checkPermissions() == false) {
             // Ask for permission
@@ -89,8 +130,34 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             Log.d(TAG, "onCreate startLocationUpdates.");
             startLocationUpdates();
         }
+
+
     }
 
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putBoolean(REQUESTING_LOCATION_UPDATES_KEY,
+                mRequestingLocationUpdates);
+        // ...
+        super.onSaveInstanceState(outState);
+    }
+
+    private void updateValuesFromBundle(Bundle savedInstanceState) {
+        if (savedInstanceState == null) {
+            return;
+        }
+
+        // Update the value of mRequestingLocationUpdates from the Bundle.
+        if (savedInstanceState.keySet().contains(REQUESTING_LOCATION_UPDATES_KEY)) {
+            mRequestingLocationUpdates = savedInstanceState.getBoolean(
+                    REQUESTING_LOCATION_UPDATES_KEY);
+        }
+
+        // ...
+
+        // Update UI to match restored state
+//        updateUI();
+    }
 
     /**
      * Manipulates the map once available.
@@ -115,16 +182,19 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     public void onResume() {
         super.onResume();
-        // Check location permissions
-        if (checkPermissions() == false) {
-            // Ask for permission
-            Log.d(TAG, "onResume Location Denied.");
-            requestLocationPermission();
-        } else {
-            // Get location
-            Log.d(TAG, "onResume startLocationUpdates.");
+        if (mRequestingLocationUpdates) {
             startLocationUpdates();
         }
+//        // Check location permissions
+//        if (checkPermissions() == false) {
+//            // Ask for permission
+//            Log.d(TAG, "onResume Location Denied.");
+//            requestLocationPermission();
+//        } else {
+//            // Get location
+//            Log.d(TAG, "onResume startLocationUpdates.");
+//            startLocationUpdates();
+//        }
     }
 
     private void requestLocationPermission() {
@@ -170,31 +240,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     // Trigger new location updates at interval
     @SuppressLint("MissingPermission")
     protected void startLocationUpdates() {
-        // Modified from Reference:
-        // https://github.com/codepath/android_guides/wiki/Retrieving-Location-with-LocationServices-API
-        // Create the location request to start receiving updates
-        mLocationRequest = new LocationRequest();
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        mLocationRequest.setInterval(UPDATE_INTERVAL);
-        mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
-
-        // Create LocationSettingsRequest object using location request
-        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder();
-        builder.addLocationRequest(mLocationRequest);
-        LocationSettingsRequest locationSettingsRequest = builder.build();
-
-        // Check whether location settings are satisfied
-        // https://developers.google.com/android/reference/com/google/android/gms/location/SettingsClient
-        SettingsClient settingsClient = LocationServices.getSettingsClient(this);
-        settingsClient.checkLocationSettings(locationSettingsRequest);
-
         // new Google API SDK v11 uses getFusedLocationProviderClient(this)
-        mFusedLocationClient.requestLocationUpdates(mLocationRequest, new LocationCallback() {
-            @Override
-            public void onLocationResult(LocationResult locationResult) {
-                onLocationChanged(locationResult.getLastLocation());
-            }
-        }, Looper.myLooper());
+        mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
     }
 
     private boolean checkPermissions() {
@@ -257,6 +304,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 //        mMap.moveCamera(CameraUpdateFactory.newLatLng(current));
     }
 
+
+    //https://developers.google.com/maps/documentation/android-api/location
     @Override
     public boolean onMyLocationButtonClick() {
 //        Toast.makeText(this, "MyLocation button clicked", Toast.LENGTH_SHORT).show();
@@ -267,5 +316,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     public void onMyLocationClick(@NonNull Location location) {
 //        Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
+    }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopLocationUpdates();
+    }
+
+    private void stopLocationUpdates() {
+        mFusedLocationClient.removeLocationUpdates(mLocationCallback);
     }
 }
