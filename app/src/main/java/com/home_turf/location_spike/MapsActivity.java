@@ -2,6 +2,8 @@ package com.home_turf.location_spike;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.arch.lifecycle.ViewModel;
+import android.arch.lifecycle.ViewModelStore;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
@@ -15,6 +17,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.Toast;
 
 import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -60,13 +63,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private GoogleMap mMap;
     private View mLayout;
     private boolean isMapReady;
-    private String mLongitude;
-    private String mLatitude;
-
+    private boolean zoomToCurrent;
 
     //// Location
     private FusedLocationProviderClient mFusedLocationClient;
-    private Location mCurrentLocation;
     private LocationCallback mLocationCallback;
     private boolean mRequestingLocationUpdates;
 
@@ -95,6 +95,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         // Load Map Fragment Asynchronously. Get notified via onMapReady function
         isMapReady = false;
+        zoomToCurrent = false;
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
@@ -149,8 +150,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         outState.putBoolean(REQUESTING_LOCATION_UPDATES_KEY,
                 mRequestingLocationUpdates);
 
-        // Save Current Location and Camera Angle
-
+        // TODO Save Current Location and Camera Angle
+        //
         super.onSaveInstanceState(outState);
     }
 
@@ -231,7 +232,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             if (isGpsEnabled && isNetworkEnabled) { return true; }
             else { return false; }
-            
+
         } catch (NullPointerException e) {
             return false;
         }
@@ -340,6 +341,25 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @SuppressLint("MissingPermission")
     protected void startLocationUpdates() {
+        // Get last known location
+        mFusedLocationClient.getLastLocation()
+                .addOnSuccessListener(new OnSuccessListener<Location>() {
+                    @Override
+                    public void onSuccess(Location location) {
+                        // GPS location can be null if GPS is switched off
+                        if (location != null) {
+                            onLocationChanged(location);
+                            zoomToCurrent = true;
+                        }
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Log.d("MapDemoActivity", "Error trying to get last GPS location");
+                        e.printStackTrace();
+                    }
+                });
         // new Google API SDK v11 uses getFus   edLocationProviderClient(this)
         mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
     }
@@ -351,18 +371,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @SuppressLint("MissingPermission")
     private void onLocationChanged(Location location) {
-        if (isMapReady) {
+        if (isMapReady && zoomToCurrent) {
             // New location has now been determined
             if (location != null) {
-                mCurrentLocation = location;
-                mLatitude = String.valueOf(mCurrentLocation.getLatitude());
-                mLongitude = String.valueOf(mCurrentLocation.getLongitude());
-                Log.d(TAG, mLatitude + " " + mLongitude);
-                // Update Screen
-
-            } else {
-                // Update Screen
-
+                // Update Screen To current location on start
+                float zoomLevel = 8.0f; //This goes up to 21
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+                        new LatLng(location.getLatitude(),
+                                location.getLongitude()), zoomLevel));
+                zoomToCurrent = false;
             }
         }
     }
@@ -375,12 +392,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     public boolean onMyLocationButtonClick() {
 //        Toast.makeText(this, "MyLocation button clicked", Toast.LENGTH_SHORT).show();
         // Zooms to User location
+
         return false;
     }
 
     @Override
     public void onMyLocationClick(@NonNull Location location) {
-//        Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
     }
 
 
@@ -391,7 +409,18 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     @SuppressLint("MissingPermission")
     @Override
     public void onMapReady(GoogleMap googleMap) {
+        isMapReady = true;
+        zoomToCurrent = true;
         mMap = googleMap;
+        mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
+        mMap.setMinZoomPreference(6.0f);
+        mMap.setMaxZoomPreference(14.0f);
+
+        googleMap.getUiSettings().setZoomControlsEnabled(true);
+        googleMap.getUiSettings().setCompassEnabled(true);
+        googleMap.getUiSettings().setAllGesturesEnabled(true);
+
+
         // Access Current Location
         mMap.setMyLocationEnabled(true);
         mMap.setOnMyLocationButtonClickListener(this);  // When upper right button clicked
