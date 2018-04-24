@@ -2,8 +2,6 @@ package com.home_turf.location_spike;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.arch.lifecycle.ViewModel;
-import android.arch.lifecycle.ViewModelStore;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
@@ -34,7 +32,6 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -176,8 +173,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     /*
     * Location Permission and Update Functions
     * */
-
-
     private void checkLocationServices() {
         // Check location permissions & providers
         if (!checkPermissions()) {
@@ -207,7 +202,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         }
     }
-
 
     private boolean checkPermissions() {
         if (ActivityCompat.checkSelfPermission(this,
@@ -338,7 +332,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-
     @SuppressLint("MissingPermission")
     protected void startLocationUpdates() {
         // Get last known location
@@ -385,7 +378,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
 
-    /* Current Location Functions
+    /* Current Location Google API Inferface
     * https://developers.google.com/maps/documentation/android-api/location
     * */
     @Override
@@ -433,16 +426,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void addGamePins() {
         // Mock game
         ArrayList<Double> latitudes = new ArrayList<>();
-        latitudes.add(-30.0);
-        latitudes.add(-40.0);
-        latitudes.add(-50.0);
-        latitudes.add(-60.0);
+        latitudes.add(39.125);
+        latitudes.add(39.120);
+        latitudes.add(39.123);
+        latitudes.add(39.122);
 
         ArrayList<Double> longitudes = new ArrayList<>();
-        longitudes.add(90.0);
-        longitudes.add(80.0);
-        longitudes.add(70.0);
-        longitudes.add(60.0);
+        longitudes.add(-94.532);
+        longitudes.add(-94.535);
+        longitudes.add(-94.531);
+        longitudes.add(-94.536);
 
         ArrayList<String> names = new ArrayList<>();
         names.add("Game 1");
