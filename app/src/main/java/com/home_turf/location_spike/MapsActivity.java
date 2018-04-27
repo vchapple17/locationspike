@@ -40,6 +40,7 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,15 +59,19 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final String TAG = MapsActivity.class.getSimpleName();
     private static final int LOCATION_PERMISSION_RESULT = 17;
     private static final int REQUEST_CHECK_SETTINGS = 1234;
-    private static final String BASEBALL_STRING = "BASEBALL";
-    private static final String BASKETBALL_STRING = "BASKETBALL";
-    private static final String FASTPITCH_STRING = "FASTPITCH";
-    private static final String SLOWPITCH_STRING = "SLOWPITCH";
-//    private static final String SOCCER_STRING = "SOCCER";
-//    private static final String FOOTBALL_STRING = "FOOTBALL";
-    private static final String TENNIS_STRING = "TENNIS";
 
-    private static final String UNKNOWN_SPORT_STRING = "blah";
+//    private static final int NUM_SPORTS = 7;
+    private static final List<String> SPORTS = new ArrayList<>();
+    private static final String BASEBALL_STRING = "baseball.png";
+    private static final String BASKETBALL_STRING = "basketball.png";
+    private static final String FASTPITCH_STRING = "fastpitch.png";
+    private static final String SLOWPITCH_STRING = "slowpitch.png";
+    private static final String PINGPONG_STRING = "pingpong.png";
+    private static final String TENNIS_STRING = "tennis.png";
+
+//    private static final String SOCCER_STRING = "soccer.png";
+//    private static final String FOOTBALL_STRING = "football.png";
+
 
     // Outlets
     private GoogleMap mMap;
@@ -93,6 +98,18 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // SPORT NAMES
+        SPORTS.add(BASEBALL_STRING);
+        SPORTS.add(BASKETBALL_STRING);
+        SPORTS.add(FASTPITCH_STRING);
+        SPORTS.add(SLOWPITCH_STRING);
+        SPORTS.add(PINGPONG_STRING);
+        SPORTS.add(TENNIS_STRING);
+
+//    private static final String SOCCER_STRING = "SOCCER";
+//    private static final String FOOTBALL_STRING = "FOOTBALL";
+
+
         // Basic setup from bundle
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
@@ -246,35 +263,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
-//    private void checkLocationServices() {
-//        mRequestingLocationUpdates = false;
-//        // Check location permissions & providers
-//        if (!checkPermissions()) {
-//            // Ask for permissions to access Location Information
-//            Log.d(TAG, "onResume Location Denied.");
-//            requestLocationPermission();
-//        } else {
-//            if (checkProviders()) {
-//                // Permissions granted and providers are enabled.
-//                Log.d(TAG, "onResume startLocationUpdates.");
-//                startLocationUpdates();
-//            } else {
-//                // Permissions granted but providers turned off
-//                // Send to main location settings to turn on GPS and Network
-//                Log.d(TAG, "onResume noProviders available.");
-////                startLocationUpdates();
-//                Snackbar.make(mLayout, R.string.locationPermissionRequired,
-//                        Snackbar.LENGTH_INDEFINITE).setAction(R.string.okButtonText, new View.OnClickListener() {
-//                    @Override
-//                    public void onClick(View view) {
-//                        // Request the permission
-//                        Log.d(TAG, "requestLocationPermission OK to request Location Permission.");
-//                        startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-//                    }
-//                }).show();
-//            }
-//        }
-//    }
     private boolean checkPermissions() {
         if (ActivityCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
@@ -537,82 +525,143 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
     private void addGamePins() {
         // Mock game
-        ArrayList<Double> latitudes = new ArrayList<>();
-        latitudes.add(39.125);
-        latitudes.add(39.120);
-        latitudes.add(39.123);
-        latitudes.add(39.122);
-        latitudes.add(39.130);
-        latitudes.add(39.120);
-        latitudes.add(39.123);
+//        ArrayList<Double> latitudes = new ArrayList<>();
+//        latitudes.add(39.125);
+//        latitudes.add(39.120);
+//        latitudes.add(39.123);
+//        latitudes.add(39.122);
+//        latitudes.add(39.130);
+//        latitudes.add(39.120);
+//        latitudes.add(39.123);
+//
+//
+//        ArrayList<Double> longitudes = new ArrayList<>();
+//        longitudes.add(-94.532);
+//        longitudes.add(-94.535);
+//        longitudes.add(-94.531);
+//        longitudes.add(-94.536);
+//        longitudes.add(-94.535);
+//        longitudes.add(-94.531);
+//        longitudes.add(-94.532);
+//
+//        ArrayList<String> names = new ArrayList<>();
+//        names.add("Game 1");
+//        names.add("Game 2");
+//        names.add("Game 3");
+//        names.add("Game 4");
+//        names.add("Game 5");
+//        names.add("Game 6");
+//        names.add("Game 7");
 
+        List<Game> games = Game.newGames(15);
+        for (Game g :
+             games) {
+            addGamePin(g);
 
-        ArrayList<Double> longitudes = new ArrayList<>();
-        longitudes.add(-94.532);
-        longitudes.add(-94.535);
-        longitudes.add(-94.531);
-        longitudes.add(-94.536);
-        longitudes.add(-94.535);
-        longitudes.add(-94.531);
-        longitudes.add(-94.532);
-
-        ArrayList<String> names = new ArrayList<>();
-        names.add("Game 1");
-        names.add("Game 2");
-        names.add("Game 3");
-        names.add("Game 4");
-        names.add("Game 5");
-        names.add("Game 6");
-        names.add("Game 7");
-
-        final int size = latitudes.size();
-        int num = 5 + 1;
-        for (int i = 0; i < size; i++) {
-            if (i % num == 0) {
-                addGamePin(latitudes.get(i), longitudes.get(i), names.get(i), BASEBALL_STRING);
-            } else if (i % num == 1) {
-                addGamePin(latitudes.get(i), longitudes.get(i), names.get(i), BASKETBALL_STRING);
-            } else if (i % num == 2) {
-                addGamePin(latitudes.get(i), longitudes.get(i), names.get(i), FASTPITCH_STRING);
-            } else if (i % num == 3) {
-                addGamePin(latitudes.get(i), longitudes.get(i), names.get(i), SLOWPITCH_STRING);
-            } else if (i % num == 4) {
-                addGamePin(latitudes.get(i), longitudes.get(i), names.get(i), TENNIS_STRING);
-            } else if (i % num == 5) {
-                addGamePin(latitudes.get(i), longitudes.get(i), names.get(i), UNKNOWN_SPORT_STRING);
-            }
         }
     }
 
-    private void addGamePin(Double lat, Double lon, String name, String sport) {
-        LatLng pin = new LatLng(lat, lon);
+    private void addGamePin(Game g) {
+        LatLng pin = new LatLng(g.getLatitude(), g.getLongitude());
         MarkerOptions mark = new MarkerOptions()
                 .position(pin)
-                .title(name)
-                .snippet("More information here");
+                .title(g.getName())
+                .snippet(g.getSnippet())
+                .icon(BitmapDescriptorFactory.fromAsset(g.getFilename()));
 //                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
-        switch(sport) {
-            case BASEBALL_STRING:
-                mark.icon(BitmapDescriptorFactory.fromAsset("baseball.png"));
-                break;
-            case BASKETBALL_STRING:
-                mark.icon(BitmapDescriptorFactory.fromAsset("basketball.png"));
-                break;
-            case TENNIS_STRING:
-                mark.icon(BitmapDescriptorFactory.fromAsset("tennis.png"));
-                break;
-            case FASTPITCH_STRING:
-                mark.icon(BitmapDescriptorFactory.fromAsset("fastpitch.png"));
-                break;
-            case SLOWPITCH_STRING:
-                mark.icon(BitmapDescriptorFactory.fromAsset("slowpitch.png"));
-                break;
-        }
-
         mMap.addMarker(mark);
     }
 
 
 
+    private static class Game {
+        static private List<String> sportStrings = new ArrayList<>();
+        static private List<Game> games = new ArrayList<>();
 
+        public Double getLongitude() {
+            return longitude;
+        }
+
+        public Double getLatitude() {
+            return latitude;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getFilename() {
+            return filename;
+        }
+
+        public String getSnippet() {
+            return snippet;
+        }
+
+        private Double longitude;
+        private Double latitude;
+        private String name;
+        private String filename;
+        private String snippet;
+
+        Game(Double lat, Double lon, String n, String f, String s) {
+            this.longitude = lon;
+            this.latitude = lat;
+            this.name = n;
+            this.filename = f;
+            this.snippet = s;
+        }
+
+        static List<Game> getGames() {
+            return games;
+        }
+        static List<Game> newGames(int n) {
+            // Clear List of Games
+            if (games == null) { games = new ArrayList<>(); }
+            else { games.clear(); }
+
+            for(int i = 0; i < n; i++) {
+                games.add( newGame() );
+            }
+            return games;
+        }
+
+        static Game newGame() {
+            if (games == null) { games = new ArrayList<>(); }
+//            Double lat = Math.random()*(180);
+//            if (lat > 90) lat -= 90;
+//            Double lon = Math.random()*(360);
+//            if (lon > 180) lon -= 180;
+
+            Double lat = Math.random()*.01 + 39.12;
+            Double lon = -Math.random()*.01 - 94.53;
+
+            return new Game(lat, lon, "Game #" + String.valueOf(games.size()), randomSportString(), randomSnippet());
+
+        }
+
+        static String randomSportString() {
+            if (SPORTS.size() > 0 ) {
+                int r = (int) (Math.random() * SPORTS.size());
+                try {
+                    return SPORTS.get(r);
+                } catch (Exception e) {
+                    return SPORTS.get(0);
+                }
+            } else { return ""; }
+        }
+
+        static String randomSnippet() {
+            int r = (int) (Math.random() * 3);
+            switch (r) {
+                case 0:
+                    return "Beginner's looking for fun.";
+                case 1:
+                    return "Intermediate or Expert players.";
+                case 2:
+                    return "Senior league";
+            }
+            return "";
+        }
+    }
 }

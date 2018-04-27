@@ -205,4 +205,5 @@ public class MainActivity extends AppCompatActivity
             mLongitude.setText(String.valueOf(DEFAULT_LON));
         }
     }
+
 }
