@@ -2,6 +2,7 @@ package com.home_turf.location_spike;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
@@ -14,6 +15,7 @@ import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -40,9 +42,14 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
+
+
+// TEST Map stays focused on current CameraPosition
+// TODO Zoom to current location onCreate and only once
+// TODO Permissions separated. - Google Services first, Airplane Mode, Permissions
+// TODO Override/overload onClick for Joining Room
 
 // Save State
 // https://developer.android.com/topic/libraries/architecture/saving-states.html
@@ -57,10 +64,20 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     // Constants
     private static final String TAG = MapsActivity.class.getSimpleName();
+    private static final Double DEFAULT_LAT = 45.0;
+    private static final Double DEFAULT_LON = -95.0;
+    private static final Float DEFAULT_ZOOM = 8.0f;
+    private static final Float CURRENT_ZOOM = 15.0f;
+
     private static final int LOCATION_PERMISSION_RESULT = 17;
     private static final int REQUEST_CHECK_SETTINGS = 1234;
 
-//    private static final int NUM_SPORTS = 7;
+    // Check Location Services possible results
+    private static final int LOCATION_SERVICES_OK = 0;
+    private static final int LOCATION_SERVICES_NO_NETWORK = 1000;        // AIRPLANE MODE
+    private static final int LOCATION_SERVICES_NO_PERMISSIONS = 2000;    // APP LOCATION OFF
+    private static final int LOCATION_SERVICES_NO_PHONE_LOCATION = 3000; // PHONE LOCATION OFF
+
     private static final List<String> SPORTS = new ArrayList<>();
     private static final String BASEBALL_STRING = "baseball.png";
     private static final String BASKETBALL_STRING = "basketball.png";
@@ -69,10 +86,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final String PINGPONG_STRING = "pingpong.png";
     private static final String TENNIS_STRING = "tennis.png";
 
-//    private static final String SOCCER_STRING = "soccer.png";
-//    private static final String FOOTBALL_STRING = "football.png";
-
-
     // Outlets
     private GoogleMap mMap;
     private View mLayout;
@@ -80,11 +93,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     //// Location
     private FusedLocationProviderClient mFusedLocationClient;
     private LocationCallback mLocationCallback;
-    private boolean mRequestingLocationUpdates;
 
     // Keys for storing activity state in the Bundle.
     protected final static String STATE_MAP_CAMERA_KEY = "camera-location-key";
-    protected final static String STATE_MAP_RECENTER_KEY = "camera-recenter-key";
 
     // Location Services API
     private LocationRequest mLocationRequest;
@@ -92,12 +103,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private long FASTEST_INTERVAL = 2000; /* 2 sec */
 
     // Google Map
-    private boolean isMapReady;
-    private boolean zoomToCurrentLocation;
     private CameraPosition mCameraPosition;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        mCameraPosition = null;
+
         // SPORT NAMES
         SPORTS.add(BASEBALL_STRING);
         SPORTS.add(BASKETBALL_STRING);
@@ -106,24 +117,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         SPORTS.add(PINGPONG_STRING);
         SPORTS.add(TENNIS_STRING);
 
-//    private static final String SOCCER_STRING = "SOCCER";
-//    private static final String FOOTBALL_STRING = "FOOTBALL";
-
-
         // Basic setup from bundle
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
-        zoomToCurrentLocation = true;
         updateValuesFromBundle(savedInstanceState);
         mLayout = findViewById(R.id.map_layout);
 
         // Location Client
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        mRequestingLocationUpdates = false;        // Check permissions when false
 
         // Load Map Fragment Asynchronously. Get notified via onMapReady function
-        isMapReady = false;
-
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
@@ -131,20 +134,80 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         // Synchr. - Create Location Callback
         createLocationCallback();
 
-        // Async. - Create Location Request and Check Phone Settings
-        createLocationRequest();
-
     }
 
+    private void requestPhoneLocationActivate() {
+        Snackbar.make(mLayout, R.string.locationPermissionRequired,
+                Snackbar.LENGTH_INDEFINITE).setAction(R.string.okButtonText,
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        // Request the permission
+                        Log.d(TAG, "requestPhoneLocationActivate.");
+                        // Upon user hitting back button on this new activity,
+                        // the user returns to this Activity at function: onResume()
+                        startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                    }
+                }).show();
+    }
+
+    private void loadMap() {
+        if (mMap != null) {
+            // Restore any saved Instance of Camera Position (such as due to phone rotation)
+            if (mCameraPosition == null) {
+                // Default
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+                        new LatLng(DEFAULT_LAT, DEFAULT_LON),
+                        DEFAULT_ZOOM));
+            } else {
+                // Saved Camera Location
+                mMap.moveCamera(CameraUpdateFactory.newCameraPosition(mCameraPosition));
+            }
+        }
+    }
+    private boolean handleLocationServices() {
+        // If this function returns true, call startLocationUpdates()
+        switch (checkLocationServices()) {
+            case LOCATION_SERVICES_NO_NETWORK:
+                // Network not connected
+                Log.d(TAG, "LOCATION_SERVICES_NO_NETWORK Network not connected (Airplane Mode).");
+                alertNoNetwork(); // Asynch: diverts user to Settings
+                tearDownMyLocationOnMap();
+                return false;
+            case LOCATION_SERVICES_NO_PERMISSIONS:
+                // App not permitted to access location
+                Log.d(TAG, "LOCATION_SERVICES_NO_PERMISSIONS App needs location permissions.");
+                requestLocationPermission(); // Asynch: Asks user to allow permission
+                tearDownMyLocationOnMap();
+                return false;
+            case LOCATION_SERVICES_NO_PHONE_LOCATION:
+                Log.d(TAG, "LOCATION_SERVICES_NO_PHONE_LOCATION Location off for phone.");
+                requestPhoneLocationActivate(); // Asynch: Ask user to turn on Location for phone
+                tearDownMyLocationOnMap();
+                return false;
+            // Fallthrough
+            case LOCATION_SERVICES_OK:
+            default:
+                return true;
+        }
+    }
 
     @Override
     public void onResume() {
         super.onResume();
-        if (checkLocationServices()) {
+        Log.d(TAG, "onResume");
+        if (mLocationRequest == null) {
+            // Async. - Create Location Request and Check Phone Settings
+            createLocationRequest();    // This will call startLocationUpdates() when successful
+        }
+        else if (handleLocationServices()) {    // Services are active, call startLocationUpdates
             startLocationUpdates();
-            if (isMapReady) {
-                setupMyLocationOnMap();
-            }
+        }
+        else {
+            // Do nothing
+            // handleLocationServices has already directed the user
+            // on how to fix issues with location services.
+            // then onResume will be called
         }
     }
 
@@ -154,7 +217,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         stopLocationUpdates();
     }
 
-    /* Handle any results Exception Resolution of Permissions */
+    /* Handle any callbacks for API Exception Resolution of Permissions */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         // Handle that Settings Request Check was successful
@@ -162,13 +225,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             switch (resultCode) {
                 case RESULT_OK:
                     Log.i(TAG, "User agreed to make required location settings changes.");
-                    // Nothing to do. startLocationUpdates() gets called in onResume again.
+                    // Nothing to do. startLocationUpdates() gets called in onResume, which occurs
+                    // after this function completes.
                     break;
                 case RESULT_CANCELED:
                     Log.i(TAG, "User chose not to make required location settings changes.");
-                    mRequestingLocationUpdates = false;
                     Snackbar.make(mLayout, "Location Services are Required", Snackbar.LENGTH_LONG);
                     mMap.clear();
+                    // Send user back or to another activity
                     break;
             }
         }
@@ -182,7 +246,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onSaveInstanceState(Bundle outState) {
         Log.i(TAG, "onSaveInstanceState called");
         if (mMap != null) {
-            outState.putBoolean(STATE_MAP_RECENTER_KEY, zoomToCurrentLocation);
             outState.putParcelable(STATE_MAP_CAMERA_KEY, mMap.getCameraPosition());
         }
         super.onSaveInstanceState(outState);
@@ -192,77 +255,66 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (savedInstanceState == null) {
             return;
         }
-
         // Update the value of mCameraPosition from the Bundle.
-        if (savedInstanceState.keySet().contains(STATE_MAP_RECENTER_KEY)) {
-            zoomToCurrentLocation = savedInstanceState.getBoolean(
-                    STATE_MAP_RECENTER_KEY);
-            if (!zoomToCurrentLocation && (savedInstanceState.keySet().contains(STATE_MAP_CAMERA_KEY))) {
-                Log.i(TAG, "updateValuesFromBundle camera position");
-                mCameraPosition = savedInstanceState.getParcelable(STATE_MAP_CAMERA_KEY);
-            }
+        if (savedInstanceState.keySet().contains(STATE_MAP_CAMERA_KEY)) {
+            Log.i(TAG, "updateValuesFromBundle camera position");
+            mCameraPosition = savedInstanceState.getParcelable(STATE_MAP_CAMERA_KEY);
         } else {
-            zoomToCurrentLocation = true;
             mCameraPosition = null;
         }
     }
 
-
     /*
      * Location Permission and Update Functions
      * */
-    private boolean checkLocationServices() {
-        mRequestingLocationUpdates = false;
-        // Check location permissions & providers
-        boolean hasPermission = checkPermissions();
-        boolean hasProviders = checkProviders();
-
+    private int checkLocationServices() {
+        // AIRPLANE MODE
         if (!isNetworkConnected()) {
-            // Network not connected
-            Log.d(TAG, "checkLocationServices Network not connected.");
-            Snackbar.make(mLayout, R.string.locationPermissionRequired,
-                    Snackbar.LENGTH_INDEFINITE).setAction(R.string.okButtonText, new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    // Request the permission
-                    startActivity(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS));
-                }
-            }).show();
-            return false;
+            return LOCATION_SERVICES_NO_NETWORK;
         }
 
-        // Test permissions and providers
-        if (hasPermission && hasProviders) {
-            // Permissions granted and providers are enabled.
-            Log.d(TAG, "checkLocationServices startLocationUpdates.");
-            mRequestingLocationUpdates = true;
-            return true;
-        }
-        if (!hasPermission) {
-            // Permission denied.
-            // Ask for permissions to access Location Information
-            Log.d(TAG, "checkLocationServices Location Denied.");
-            requestLocationPermission();
-        }
-        if (!hasProviders) {
-            // Permissions granted but providers turned off
-            // Send to main location settings to turn on GPS and Network
-            Log.d(TAG, "checkLocationServices noProviders available.");
-            Snackbar.make(mLayout, R.string.locationPermissionRequired,
-                    Snackbar.LENGTH_INDEFINITE).setAction(R.string.okButtonText, new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    // Request the permission
-                    Log.d(TAG, "checkLocationServices OK to request Location Permission.");
-                    startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-                }
-            }).show();
+        // APP SPECIFIC PERMISSIONS
+        if (!checkPermissions()) {
+            return LOCATION_SERVICES_NO_PERMISSIONS;
         }
 
-        return false;
-
+        // PHONE ALLOWS LOCATION IN GENERAL
+        if (!checkProviders()) {
+            return LOCATION_SERVICES_NO_PHONE_LOCATION;
+        }
+        return LOCATION_SERVICES_OK;
     }
 
+    // Check that AIRPLANE MODE IS OFF
+    private boolean isNetworkConnected() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(MapsActivity.CONNECTIVITY_SERVICE);
+
+        return cm.getActiveNetworkInfo() != null;
+    }
+
+    private void alertNoNetwork() {
+        // Citation:
+        // https://stackoverflow.com/questions/2115758/how-do-i-display-an-alert-dialog-on-android
+        AlertDialog.Builder builder;
+        builder = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert);
+        builder.setTitle(R.string.networkAccessRequired)
+                .setMessage(R.string.networkAccessRequiredMessage)
+                .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        // Direct to settings and will come back to onResume()
+                        startActivity(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS));
+                    }
+                })
+                .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        // do nothing or return home.
+                    }
+                })
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .show();
+    }
+
+    // Check that App has location permissions granted
     private boolean checkPermissions() {
         if (ActivityCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
@@ -275,12 +327,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    private boolean isNetworkConnected() {
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(MapsActivity.CONNECTIVITY_SERVICE);
-
-        return cm.getActiveNetworkInfo() != null;
-    }
-
+    // Check that phone allows location to be provided
     private boolean checkProviders() {
         LocationManager locationManager = (LocationManager) getApplicationContext()
                 .getSystemService(LOCATION_SERVICE);
@@ -289,7 +336,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             boolean isGpsEnabled = false;
             boolean isNetworkEnabled = false;
             for (String s : providers) {
-                Log.d(TAG, s);
                 if (s.equals("gps")) {
                     isGpsEnabled = true;
                 } else if (s.equals("network")) {
@@ -310,7 +356,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
+    // Asynchronous call to create and add a Location Request.
+    // Upon success, location logic beings
     private void createLocationRequest() {
+        Log.d(TAG, "createLocationRequest");
         // Location Request object for Updating location
         // https://github.com/codepath/android_guides/wiki/Retrieving-Location-with-LocationServices-API
         mLocationRequest = new LocationRequest();
@@ -332,7 +381,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 // All location settings are satisfied. The client can initialize
                 // location requests here.
                 // ...
-                checkLocationServices();
+                if (handleLocationServices()) {
+                    Log.d(TAG, "createLocationRequest handleLocationServices=TRUE");
+                    startLocationUpdates();
+                } else {
+                    Log.d(TAG, "createLocationRequest handleLocationServices=FALSE");
+                }
             }
         });
         // If location settings are not good...
@@ -361,10 +415,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void onLocationResult(LocationResult locationResult) {
                 if (locationResult == null) return;
-                for (Location location : locationResult.getLocations()) {
-                    // Update UI with location data
-                    onLocationChanged(locationResult.getLastLocation());
-                }
+                // Update UI with location data
+                onLocationChanged(locationResult.getLastLocation());
             }
         };
     }
@@ -392,7 +444,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void startLocationPermissionRequest() {
         ActivityCompat.requestPermissions(MapsActivity.this,
                 new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                LOCATION_PERMISSION_RESULT);    // IDENTIFIER FOR REQUEST CALLBACK
+                LOCATION_PERMISSION_RESULT);    // IDENTIFIER FOR onRequestPermissionsResult
     }
 
     // Handle the callback from startLocationPermissionRequest()
@@ -402,64 +454,67 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "onRequestPermissionsResult");
         if (requestCode == LOCATION_PERMISSION_RESULT) {
             // Analyze for location permission.
-            if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Permission has been granted. Get Location
+            // Permissions granted, make sure  Phone locations in general is ON.
+            if (handleLocationServices()) {
+                // Permission has been granted. & Providers are available
                 Log.d(TAG, "onRequestPermissionsResult Permission granted");
-                mRequestingLocationUpdates = true;
-                if (checkLocationServices()) {
-                    startLocationUpdates();
-                    if (isMapReady) {
-                        setupMyLocationOnMap();
-                    }
-                }
-            }
-            else {
-                mRequestingLocationUpdates = false;
+                startLocationUpdates();
             }
         }
     }
 
     @SuppressLint("MissingPermission")
     protected void startLocationUpdates() {
-        // Get last known location
+        // Must have already checked that app has permission!!!!
+        Log.d(TAG, "startLocationUpdates");
+        // Set up client to get last known location
         mFusedLocationClient.getLastLocation()
-                .addOnSuccessListener(new OnSuccessListener<Location>() {
-                    @Override
-                    public void onSuccess(Location location) {
-                        // GPS location can be null if GPS is switched off
-                        if (location != null) {
-                            onLocationChanged(location);
-                        }
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        mRequestingLocationUpdates = false;
-                        Log.d("MapDemoActivity", "Error trying to get last GPS location");
-                        e.printStackTrace();
-                    }
-                });
+            .addOnSuccessListener(new OnSuccessListener<Location>() {
+                @Override
+                public void onSuccess(Location location) {
+                    // FYI: GPS location can be null if GPS is switched off
+                    Log.d("MapDemoActivity", "startLocationUpdates: onSuccess, call onLocationChanged");
+                    onLocationChanged(location);
+                }
+            })
+            .addOnFailureListener(new OnFailureListener() {
+                @Override
+                public void onFailure(@NonNull Exception e) {
+                Log.d("MapDemoActivity", "Error trying to get last GPS location");
+                e.printStackTrace();
+                }
+            });
+        // Start updates
         mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
     }
 
     private void stopLocationUpdates() {
         mFusedLocationClient.removeLocationUpdates(mLocationCallback);
-        mRequestingLocationUpdates = false;
     }
 
-    @SuppressLint("MissingPermission")
     private void onLocationChanged(Location location) {
-        if (isMapReady && zoomToCurrentLocation) {
-            // New location has now been determined
-            if (location != null) {
-                // Update Screen To current location on start
-                float zoomLevel = 13.0f; //This goes up to 21
+        // Update UI with new location only when map is new.
+        // Note: New Location, may be null
+        if (location == null) {
+            Log.d(TAG, "onLocationChanged location==null");
+            return;
+        }
+
+        if ((mMap != null) && (!mMap.isMyLocationEnabled())) {
+            // Add My Location Capabilities to Map
+            setupMyLocationOnMap();
+
+            if (mCameraPosition == null) {
+                // Zoom to current location
+                float zoomLevel = CURRENT_ZOOM; //This goes up to 21
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
                         new LatLng(location.getLatitude(),
                                 location.getLongitude()), zoomLevel));
-                zoomToCurrentLocation = false;
             }
+        }
+        if (mMap != null) {
+            // Save Camera View of map
+            mCameraPosition = mMap.getCameraPosition();
         }
     }
 
@@ -469,95 +524,67 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
      * */
     @Override
     public boolean onMyLocationButtonClick() {
-//        Toast.makeText(this, "MyLocation button clicked", Toast.LENGTH_SHORT).show();
-        // Zooms to User location
-
+        // Zooms to User location by default
         return false;
     }
 
     @Override
     public void onMyLocationClick(@NonNull Location location) {
+        // By default shows title and snippet.
         Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
     }
 
 
     /*
-     * Populate Map
+     * Populate & Setup Map
      */
-    @SuppressLint("MissingPermission")
     @Override
     public void onMapReady(GoogleMap googleMap) {
-        isMapReady = true;
-
+        Log.d(TAG, "onMapReady");
         mMap = googleMap;
         mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
-        mMap.setMinZoomPreference(6.0f);
-        mMap.moveCamera(CameraUpdateFactory.zoomTo(21f));
+        mMap.setMinZoomPreference(2.0f);
+        mMap.moveCamera(CameraUpdateFactory.zoomTo(14f));
         mMap.setMaxZoomPreference(18.0f);
 
         mMap.getUiSettings().setZoomControlsEnabled(true);
         mMap.getUiSettings().setCompassEnabled(true);
         mMap.getUiSettings().setAllGesturesEnabled(true);
 
-        // Restore Camera Position
-        if (mCameraPosition != null) {
-            Log.d(TAG, "camera position");
-            Log.d(TAG, mCameraPosition.toString());
-            mMap.moveCamera(CameraUpdateFactory.newCameraPosition(mCameraPosition));
-        }
+        loadMap();
 
-        setupMyLocationOnMap();
-
-        addGamePins();  // Add game pins
+        // Add Mock Game Pins to Map
+        addGamePins(Game.newGames(15));  // Add game pins
     }
-
 
     @SuppressLint("MissingPermission")
     private void setupMyLocationOnMap() {
-        // Access Current Location
-        if (mRequestingLocationUpdates && isMapReady) {
-            if (checkLocationServices()) {
-                mMap.setMyLocationEnabled(true);
-                mMap.setOnMyLocationButtonClickListener(this);  // When upper right button clicked
-                mMap.setOnMyLocationClickListener(this);        // When blue dot clicked
-            }
+        // Access Current Location on map
+        if (mMap != null && checkPermissions() ) {
+            mMap.setMyLocationEnabled(true);
+            mMap.setOnMyLocationButtonClickListener(this);  // When upper right button clicked
+            mMap.setOnMyLocationClickListener(this);        // When blue dot clicked
         }
     }
-    private void addGamePins() {
-        // Mock game
-//        ArrayList<Double> latitudes = new ArrayList<>();
-//        latitudes.add(39.125);
-//        latitudes.add(39.120);
-//        latitudes.add(39.123);
-//        latitudes.add(39.122);
-//        latitudes.add(39.130);
-//        latitudes.add(39.120);
-//        latitudes.add(39.123);
-//
-//
-//        ArrayList<Double> longitudes = new ArrayList<>();
-//        longitudes.add(-94.532);
-//        longitudes.add(-94.535);
-//        longitudes.add(-94.531);
-//        longitudes.add(-94.536);
-//        longitudes.add(-94.535);
-//        longitudes.add(-94.531);
-//        longitudes.add(-94.532);
-//
-//        ArrayList<String> names = new ArrayList<>();
-//        names.add("Game 1");
-//        names.add("Game 2");
-//        names.add("Game 3");
-//        names.add("Game 4");
-//        names.add("Game 5");
-//        names.add("Game 6");
-//        names.add("Game 7");
 
-        List<Game> games = Game.newGames(15);
+    @SuppressLint("MissingPermission")
+    private void tearDownMyLocationOnMap() {
+        // Access Current Location on map
+        if (mMap != null ) {
+            // Save camera state
+            mCameraPosition = mMap.getCameraPosition();
+            mMap.setMyLocationEnabled(false);
+        }
+    }
+
+
+    /*
+     *  Mock Data
+     */
+    private void addGamePins(List<Game> games) {
         for (Game g :
              games) {
             addGamePin(g);
-
         }
     }
 
@@ -571,8 +598,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 //                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
         mMap.addMarker(mark);
     }
-
-
 
     private static class Game {
         static private List<String> sportStrings = new ArrayList<>();

@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">location-spike</string>
-    <string name="locationPermissionRequired">Let us use your current location.</string>
+    <string name="locationPermissionRequired">Let Home Turf use your current location.</string>
+    <string name="networkAccessRequired">No Network Access</string>
+    <string name="networkAccessRequiredMessage">Check Internet Connection.</string>
     <string name="okButtonText">OKAY</string>
     <string name="location_permission_granted">Location permission granted.</string>
     <string name="location_permission_denied">Location permission denied.</string>
