@@ -17,6 +17,7 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.home_turf.location_spike.mock_data.MockGameData;
 
@@ -24,7 +25,8 @@ import java.util.List;
 
 public class MyLocationActivity extends BaseLocationActivity implements OnMapReadyCallback,
         GoogleMap.OnMyLocationButtonClickListener,
-        GoogleMap.OnMyLocationClickListener {
+        GoogleMap.OnMyLocationClickListener {//},
+//        GoogleMap.OnMarkerClickListener {
 
     // String Constants
     private static final String TAG = MyLocationActivity.class.getSimpleName();
@@ -253,6 +255,12 @@ public class MyLocationActivity extends BaseLocationActivity implements OnMapRea
     }
 
 
+//    @Override
+//    public boolean onMarkerClick(Marker marker) {
+//
+//        return false;
+//    }
+
     /*
      *  Add Game Pins (Mock Data)
      */
@@ -271,7 +279,20 @@ public class MyLocationActivity extends BaseLocationActivity implements OnMapRea
                 .snippet(g.getSnippet())
                 .icon(BitmapDescriptorFactory.fromAsset(g.getFilename()));
 //                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
-        mMap.addMarker(mark);
+//        mMap.addMarker(mark);
+
+
+        CustomMapInfoWindowData info = new CustomMapInfoWindowData();
+        info.setImgName(g.getFilename());
+        info.setName(g.getName());
+        info.setDescription(g.getSnippet());
+
+        CustomMapInfoWindow customInfoWindow = new CustomMapInfoWindow(this);
+        mMap.setInfoWindowAdapter(customInfoWindow);
+
+        Marker m = mMap.addMarker(mark);
+        m.setTag(info);
+//        m.showInfoWindow();
     }
 }
 

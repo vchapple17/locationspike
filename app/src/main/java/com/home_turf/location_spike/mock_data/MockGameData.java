@@ -97,7 +97,7 @@ public class MockGameData {
         int r = (int) (Math.random() * 3);
         switch (r) {
             case 0:
-                return "Beginner's looking for fun.";
+                return "Beginners looking for fun.";
             case 1:
                 return "Intermediate or Expert players.";
             case 2:
