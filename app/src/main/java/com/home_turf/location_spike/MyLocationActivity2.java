@@ -55,7 +55,6 @@ public class MyLocationActivity2 extends BaseLocationActivity implements
     private View mLayout;
     private Location mLastLocation;
     private LatLng mPinLatLng;
-//    private MarkerOptions gamePin;
     private Marker gamePin;
 
     @Override
